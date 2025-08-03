@@ -1,9 +1,0 @@
-{
-  "name": "Plano Water Usage",
-  "content_in_root": false,
-  "filename": "plano_water",
-  "country": ["US"],
-  "homeassistant": "2023.1.0",
-  "iot_class": "Cloud Polling",
-  "render_readme": true
-}
