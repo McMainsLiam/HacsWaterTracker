@@ -59,7 +59,10 @@ class PlanoWaterSensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = self.sensor_config["icon"]
         
         if self.sensor_config["device_class"]:
-            self._attr_device_class = getattr(SensorDeviceClass, self.sensor_config["device_class"].upper())
+            if self.sensor_config["device_class"] == "timestamp":
+                self._attr_device_class = SensorDeviceClass.TIMESTAMP
+            else:
+                self._attr_device_class = getattr(SensorDeviceClass, self.sensor_config["device_class"].upper())
             
         if self.sensor_config["state_class"]:
             self._attr_state_class = getattr(SensorStateClass, self.sensor_config["state_class"].upper())
@@ -95,11 +98,13 @@ class PlanoWaterSensor(CoordinatorEntity, SensorEntity):
             last_reading = usage_data.get("last_reading")
             if last_reading:
                 try:
-                    # Convert to ISO format for timestamp sensor
-                    date_obj = datetime.strptime(last_reading, "%m/%d/%Y")
-                    return date_obj.isoformat()
+                    # Parse the datetime string from the format: "11/26/24 3:00 AM"
+                    date_obj = datetime.strptime(last_reading, "%m/%d/%y %I:%M %p")
+                    # Return as datetime object for timestamp device class
+                    return date_obj
                 except ValueError:
-                    return last_reading
+                    _LOGGER.warning("Could not parse datetime: %s", last_reading)
+                    return None
             return None
 
         return None
