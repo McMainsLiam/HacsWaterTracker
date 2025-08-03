@@ -1,0 +1,24 @@
+{
+  "title": "Plano Water Usage",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Plano Water Usage",
+        "description": "Enter your Plano utility portal credentials",
+        "data": {
+          "username": "Username",
+          "password": "Password", 
+          "account_number": "Account Number (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Plano Water portal",
+      "invalid_auth": "Invalid authentication credentials",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Account is already configured"
+    }
+  }
+}

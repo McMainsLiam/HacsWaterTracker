@@ -1,0 +1,12 @@
+{
+  "domain": "plano_water",
+  "name": "Plano Water Usage",
+  "version": "1.0.0",
+  "documentation": "https://github.com/McMainsLiam/plano-water-hass",
+  "issue_tracker": "https://github.com/McMainsLiam/plano-water-hass/issues",
+  "dependencies": [],
+  "codeowners": ["@McMainsLiam"],
+  "requirements": ["aiohttp>=3.8.0", "beautifulsoup4>=4.10.0"],
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+}
