@@ -45,10 +45,10 @@ class PlanoWaterDataUpdateCoordinator(DataUpdateCoordinator):
                 if not account_info:
                     raise UpdateFailed("Failed to get account information")
 
-            # Get usage data
+            # Get usage data from AccountSummary page
             usage_data = await self.api.async_get_usage_data()
             if not usage_data:
-                raise UpdateFailed("Failed to get usage data")
+                raise UpdateFailed("Failed to get usage data from AccountSummary page")
 
             return {
                 "account_info": self.api.account_info,

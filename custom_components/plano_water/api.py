@@ -15,7 +15,6 @@ from .const import (
     BASE_URL,
     DEFAULT_TIMEOUT,
     LOGIN_URL,
-    METER_READS_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -153,102 +152,82 @@ class PlanoWaterAPI:
             _LOGGER.exception("Error getting account info: %s", exc)
             return {}
 
-    async def async_get_usage_data(self, days: int = 30) -> dict[str, Any]:
-        """Get water usage data from the portal."""
-        if not self.session or not self.account_info:
+    async def async_get_usage_data(self) -> dict[str, Any]:
+        """Get water usage data from the AccountSummary page."""
+        if not self.session:
             if not await self.async_login():
                 return {}
-            await self.async_get_account_info()
-
-        if not self.account_info.get("meter_id"):
-            _LOGGER.error("No meter ID available")
-            return {}
 
         try:
-            # Calculate date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
-            # Format dates as expected by the API
-            start_str = start_date.strftime("%m/%d/%Y")
-            end_str = end_date.strftime("%m/%d/%Y")
-
-            # Prepare API request
-            api_data = {
-                "mtuID": self.account_info["meter_id"],
-                "sStart": start_str,
-                "sEnd": end_str,
-            }
-
-            headers = {
-                "Content-Type": "application/json; charset=utf-8",
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            async with self.session.post(
-                METER_READS_URL,
-                data=json.dumps(api_data),
-                headers=headers,
-            ) as response:
+            async with self.session.get(ACCOUNT_SUMMARY_URL) as response:
                 if response.status != 200:
-                    _LOGGER.error("Failed to get usage data: %s", response.status)
+                    _LOGGER.error("Failed to get account summary: %s", response.status)
                     return {}
 
-                result = await response.json()
+                content = await response.text()
+                soup = BeautifulSoup(content, "html.parser")
+
+                # Find the usage table in the MainContent_lblReadDateTime span
+                usage_span = soup.find("span", {"id": "MainContent_lblReadDateTime"})
+                if not usage_span:
+                    _LOGGER.error("Could not find usage data span")
+                    return {}
+
+                # Find the table within the span
+                table = usage_span.find("table")
+                if not table:
+                    _LOGGER.error("Could not find usage table")
+                    return {}
+
+                _LOGGER.debug("Found usage table, parsing records")
                 
-                # Parse the response
-                if isinstance(result, dict) and "d" in result:
-                    data = json.loads(result["d"])
-                    if data.get("status") and "list" in data:
-                        return self._parse_usage_data(data["list"])
+                # Parse the table rows
+                usage_records = []
+                rows = table.find("tbody").find_all("tr") if table.find("tbody") else table.find_all("tr")[1:]  # Skip header
                 
-                _LOGGER.warning("Unexpected API response format")
-                return {}
+                for row in rows:
+                    cols = row.find_all("td")
+                    if len(cols) >= 3:
+                        date = cols[0].get_text().strip()
+                        time = cols[1].get_text().strip()
+                        usage = cols[2].get_text().strip()
+                        
+                        # Convert usage to float, handle non-numeric values
+                        try:
+                            usage_value = float(usage)
+                        except ValueError:
+                            usage_value = 0.0
+                        
+                        usage_records.append({
+                            "date": date,
+                            "time": time,
+                            "usage": usage_value,
+                            "datetime_str": f"{date} {time}"
+                        })
+
+                _LOGGER.info("Parsed %d usage records", len(usage_records))
+                    
+                # Calculate current and daily usage
+                current_usage = usage_records[0]["usage"] if usage_records else 0
+                
+                # Sum all available usage (represents recent usage)
+                daily_usage = sum(record["usage"] for record in usage_records)
+                
+                last_reading = None
+                if usage_records:
+                    last_reading = usage_records[0]["datetime_str"]
+
+                return {
+                    "current_usage": current_usage,
+                    "daily_usage": daily_usage,
+                    "last_reading": last_reading,
+                    "raw_data": usage_records,
+                }
 
         except Exception as exc:
             _LOGGER.exception("Error getting usage data: %s", exc)
             return {}
 
-    def _parse_usage_data(self, usage_list: list) -> dict[str, Any]:
-        """Parse usage data from API response."""
-        if not usage_list:
-            return {}
-
-        current_usage = 0
-        daily_usage = 0
-        last_reading = None
-
-        try:
-            # Sort by date (most recent first)
-            sorted_usage = sorted(
-                usage_list,
-                key=lambda x: datetime.strptime(x.get("billDate", ""), "%m/%d/%Y"),
-                reverse=True,
-            )
-
-            if sorted_usage:
-                # Get most recent reading
-                latest = sorted_usage[0]
-                current_usage = float(latest.get("totalGallonsUsed", 0))
-                last_reading = latest.get("billDate", "")
-
-                # Calculate daily usage (sum of today's readings)
-                today = datetime.now().strftime("%m/%d/%Y")
-                daily_usage = sum(
-                    float(reading.get("totalGallonsUsed", 0))
-                    for reading in usage_list
-                    if reading.get("billDate", "").startswith(today.split("/")[0] + "/" + today.split("/")[1])
-                )
-
-        except Exception as exc:
-            _LOGGER.exception("Error parsing usage data: %s", exc)
-
-        return {
-            "current_usage": current_usage,
-            "daily_usage": daily_usage,
-            "last_reading": last_reading,
-            "raw_data": usage_list,
-        }
 
     async def async_close(self) -> None:
         """Close the session."""

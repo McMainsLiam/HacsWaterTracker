@@ -10,7 +10,6 @@ DEFAULT_TIMEOUT = 30
 BASE_URL = "https://cus.plano.gov"
 LOGIN_URL = f"{BASE_URL}/Account/Login"
 ACCOUNT_SUMMARY_URL = f"{BASE_URL}/AccountSummary"
-METER_READS_URL = f"{BASE_URL}/MeterReads.aspx/GetBillHistory"
 
 # Configuration keys
 CONF_USERNAME = "username"
